@@ -1,8 +1,9 @@
 import json
+import time
 
 import httpx
 
-from settings import DATA_DIR, OVERPASS_API, USER_AGENT
+from settings import DATA_DIR, OVERPASS_API, USER_AGENT, heartbeat, log
 
 CITIES_OSM_FILE = DATA_DIR / "cities_osm.json"
 
@@ -25,22 +26,36 @@ foreach .provinces->.p (
 
 def fetch_cities_osm(timeout: float = 600.0) -> dict:
     """Fetch place=city|town nodes grouped by province via a single Overpass call."""
+    log(f"[cities-osm] POST {OVERPASS_API} (timeout={timeout:.0f}s)")
+    started = time.monotonic()
     with httpx.Client(timeout=timeout, headers={"User-Agent": USER_AGENT}) as client:
-        resp = client.post(OVERPASS_API, data={"data": QUERY})
-        resp.raise_for_status()
-        data = resp.json()
+        with heartbeat("[cities-osm] waiting for Overpass"):
+            resp = client.post(OVERPASS_API, data={"data": QUERY})
+    log(
+        f"[cities-osm] {resp.status_code} {resp.reason_phrase} in "
+        f"{time.monotonic() - started:.1f}s ({len(resp.content):,} bytes)"
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    elements = data.get("elements", [])
+    log(f"[cities-osm] parsing {len(elements):,} elements")
 
     out: dict[str, dict] = {}
     current: dict | None = None
-    for el in data.get("elements", []):
+    for el in elements:
         if el.get("type") == "relation":
-            current = {
-                "name": (el.get("tags") or {}).get("name"),
-                "cities": [],
-            }
+            name = (el.get("tags") or {}).get("name")
+            current = {"name": name, "cities": []}
             out[str(el["id"])] = current
+            log(f"  province {el['id']}: {name}")
         elif el.get("type") == "node" and current is not None:
             current["cities"].append(el)
+
+    log(
+        f"[cities-osm] done: {len(out)} provinces, "
+        f"{sum(len(p['cities']) for p in out.values())} cities"
+    )
     return out
 
 
