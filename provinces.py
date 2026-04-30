@@ -1,10 +1,10 @@
 import json
 import ssl
-from pathlib import Path
 
 import httpx
 
-DATA_DIR = Path(__file__).parent / "data"
+from settings import DATA_DIR
+
 PROVINCES_FILE = DATA_DIR / "provinces.json"
 
 PROVINCE_API = "https://gnaf2.post.ir/sina/editor/tables/province/rows"
