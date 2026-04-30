@@ -1,7 +1,7 @@
 import httpx
 import typer
 
-from cities import CITIES_FILE, fetch_cities, save_cities
+from cities_osm import CITIES_OSM_FILE, fetch_cities_osm, save_cities_osm
 from provinces import PROVINCES_FILE, fetch_provinces, save_provinces
 from provinces_osm import (
     PROVINCES_OSM_FILE,
@@ -59,12 +59,12 @@ def fetch_provinces_osm_cmd() -> None:
     typer.echo(f"Saved {count} provinces to {PROVINCES_OSM_FILE}")
 
 
-@app.command(name="fetch-cities")
-def fetch_cities_cmd() -> None:
-    """Fetch place=city|town for each province from OSM Overpass and overwrite data/cities.json."""
-    payload = fetch_cities()
-    total = save_cities(payload)
-    typer.echo(f"Saved {total} cities across {len(payload)} provinces to {CITIES_FILE}")
+@app.command(name="fetch-cities-osm")
+def fetch_cities_osm_cmd() -> None:
+    """Fetch place=city|town for each province from OSM Overpass and overwrite data/cities_osm.json."""
+    payload = fetch_cities_osm()
+    total = save_cities_osm(payload)
+    typer.echo(f"Saved {total} cities across {len(payload)} provinces to {CITIES_OSM_FILE}")
 
 
 @app.command()

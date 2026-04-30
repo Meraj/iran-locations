@@ -4,7 +4,7 @@ import httpx
 
 from settings import DATA_DIR, OVERPASS_API, USER_AGENT
 
-CITIES_FILE = DATA_DIR / "cities.json"
+CITIES_OSM_FILE = DATA_DIR / "cities_osm.json"
 
 # One Overpass call: foreach province, emit the relation tags then the
 # place=city|town nodes inside its area. Output is parsed sequentially:
@@ -23,7 +23,7 @@ foreach .provinces->.p (
 """
 
 
-def fetch_cities(timeout: float = 600.0) -> dict:
+def fetch_cities_osm(timeout: float = 600.0) -> dict:
     """Fetch place=city|town nodes grouped by province via a single Overpass call."""
     with httpx.Client(timeout=timeout, headers={"User-Agent": USER_AGENT}) as client:
         resp = client.post(OVERPASS_API, data={"data": QUERY})
@@ -44,9 +44,9 @@ def fetch_cities(timeout: float = 600.0) -> dict:
     return out
 
 
-def save_cities(payload: dict) -> int:
-    CITIES_FILE.parent.mkdir(parents=True, exist_ok=True)
-    CITIES_FILE.write_text(
+def save_cities_osm(payload: dict) -> int:
+    CITIES_OSM_FILE.parent.mkdir(parents=True, exist_ok=True)
+    CITIES_OSM_FILE.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
