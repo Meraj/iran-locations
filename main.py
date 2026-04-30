@@ -4,9 +4,10 @@ import typer
 from cities_osm import CITIES_OSM_FILE, fetch_cities_osm, save_cities_osm
 from neighborhoods_osm import (
     NEIGHBORHOODS_OSM_FILE,
+    build_neighborhoods_osm,
     fetch_neighborhoods_osm_by_city,
     fetch_neighborhoods_osm_by_province,
-    save_neighborhoods_osm,
+    save_neighborhoods_osm_run,
 )
 from provinces import PROVINCES_FILE, fetch_provinces, save_provinces
 from provinces_osm import (
@@ -88,11 +89,19 @@ def fetch_neighborhoods_osm_cmd(
 
     if province is not None:
         payload = fetch_neighborhoods_osm_by_province(province)
+        path, total = save_neighborhoods_osm_run(payload, scope="province", scope_id=province)
     else:
         payload = fetch_neighborhoods_osm_by_city(city)  # type: ignore[arg-type]
+        path, total = save_neighborhoods_osm_run(payload, scope="city", scope_id=city)  # type: ignore[arg-type]
 
-    total = save_neighborhoods_osm(payload)
-    typer.echo(f"Fetched {total} neighborhoods across {len(payload)} cities. Merged into {NEIGHBORHOODS_OSM_FILE}")
+    typer.echo(f"Fetched {total} neighborhoods across {len(payload)} cities. Saved to {path}")
+
+
+@app.command(name="build-neighborhoods-osm")
+def build_neighborhoods_osm_cmd() -> None:
+    """Merge all per-run files under data/neighborhoods_osm/ into data/neighborhoods_osm.json."""
+    cities, total = build_neighborhoods_osm()
+    typer.echo(f"Merged {cities} cities ({total} neighborhoods) into {NEIGHBORHOODS_OSM_FILE}")
 
 
 @app.command()

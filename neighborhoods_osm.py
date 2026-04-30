@@ -5,6 +5,7 @@ import httpx
 from settings import DATA_DIR, OVERPASS_API, USER_AGENT
 
 NEIGHBORHOODS_OSM_FILE = DATA_DIR / "neighborhoods_osm.json"
+NEIGHBORHOODS_OSM_DIR = DATA_DIR / "neighborhoods_osm"
 
 # Per-province query: foreach admin_level=8 city in the given province,
 # emit the city relation (with geometry) then the neighborhood-level
@@ -69,15 +70,26 @@ def _fetch(query: str, timeout: float) -> dict:
     return out
 
 
-def save_neighborhoods_osm(payload: dict) -> int:
-    """Merge payload into data/neighborhoods_osm.json. Returns neighborhood count for this payload."""
-    existing: dict = {}
-    if NEIGHBORHOODS_OSM_FILE.exists():
-        existing = json.loads(NEIGHBORHOODS_OSM_FILE.read_text(encoding="utf-8"))
-    existing.update(payload)
-    NEIGHBORHOODS_OSM_FILE.parent.mkdir(parents=True, exist_ok=True)
-    NEIGHBORHOODS_OSM_FILE.write_text(
-        json.dumps(existing, ensure_ascii=False, indent=2) + "\n",
+def save_neighborhoods_osm_run(payload: dict, *, scope: str, scope_id: int):
+    """Write one run's payload to data/neighborhoods_osm/<scope>_<id>.json. Returns (path, neighborhood count)."""
+    NEIGHBORHOODS_OSM_DIR.mkdir(parents=True, exist_ok=True)
+    path = NEIGHBORHOODS_OSM_DIR / f"{scope}_{scope_id}.json"
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    return sum(len(c["neighborhoods"]) for c in payload.values())
+    return path, sum(len(c["neighborhoods"]) for c in payload.values())
+
+
+def build_neighborhoods_osm():
+    """Merge all per-run files in data/neighborhoods_osm/ into data/neighborhoods_osm.json. Returns (city count, neighborhood count)."""
+    merged: dict = {}
+    if NEIGHBORHOODS_OSM_DIR.exists():
+        for f in sorted(NEIGHBORHOODS_OSM_DIR.glob("*.json")):
+            merged.update(json.loads(f.read_text(encoding="utf-8")))
+    NEIGHBORHOODS_OSM_FILE.parent.mkdir(parents=True, exist_ok=True)
+    NEIGHBORHOODS_OSM_FILE.write_text(
+        json.dumps(merged, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return len(merged), sum(len(c["neighborhoods"]) for c in merged.values())
