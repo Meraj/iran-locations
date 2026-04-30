@@ -2,6 +2,11 @@ import httpx
 import typer
 
 from cities_osm import CITIES_OSM_FILE, fetch_cities_osm, save_cities_osm
+from neighborhoods_osm import (
+    NEIGHBORHOODS_OSM_FILE,
+    fetch_neighborhoods_osm,
+    save_neighborhoods_osm,
+)
 from provinces import PROVINCES_FILE, fetch_provinces, save_provinces
 from provinces_osm import (
     PROVINCES_OSM_FILE,
@@ -65,6 +70,14 @@ def fetch_cities_osm_cmd() -> None:
     payload = fetch_cities_osm()
     total = save_cities_osm(payload)
     typer.echo(f"Saved {total} cities across {len(payload)} provinces to {CITIES_OSM_FILE}")
+
+
+@app.command(name="fetch-neighborhoods-osm")
+def fetch_neighborhoods_osm_cmd() -> None:
+    """Fetch neighborhood-level features per admin_level=8 city from OSM Overpass and overwrite data/neighborhoods_osm.json."""
+    payload = fetch_neighborhoods_osm()
+    total = save_neighborhoods_osm(payload)
+    typer.echo(f"Saved {total} neighborhoods across {len(payload)} cities to {NEIGHBORHOODS_OSM_FILE}")
 
 
 @app.command()
