@@ -1,5 +1,3 @@
-import json
-
 import httpx
 import typer
 
@@ -63,19 +61,8 @@ def fetch_provinces_osm_cmd() -> None:
 
 @app.command(name="fetch-cities")
 def fetch_cities_cmd() -> None:
-    """Fetch place=city|town for each province from OSM Overpass and overwrite data/cities.json.
-
-    Reads provinces from data/provinces_osm.json. Run `fetch-provinces-osm` first.
-    """
-    if not PROVINCES_OSM_FILE.exists():
-        typer.echo(
-            f"{PROVINCES_OSM_FILE} not found. Run `fetch-provinces-osm` first.",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    provinces = json.loads(PROVINCES_OSM_FILE.read_text(encoding="utf-8")).get("elements", [])
-    payload = fetch_cities(provinces)
+    """Fetch place=city|town for each province from OSM Overpass and overwrite data/cities.json."""
+    payload = fetch_cities()
     total = save_cities(payload)
     typer.echo(f"Saved {total} cities across {len(payload)} provinces to {CITIES_FILE}")
 

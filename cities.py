@@ -6,31 +6,41 @@ from settings import DATA_DIR, OVERPASS_API, USER_AGENT
 
 CITIES_FILE = DATA_DIR / "cities.json"
 
-
-def _query(relation_id: int) -> str:
-    return f"""\
-[out:json][timeout:180];
-relation({relation_id})->.p;
-.p map_to_area->.a;
-node(area.a)["place"~"^(city|town)$"];
-out tags;
+# One Overpass call: foreach province, emit the relation tags then the
+# place=city|town nodes inside its area. Output is parsed sequentially:
+# each `relation` element starts a new province bucket, subsequent `node`
+# elements belong to it until the next relation.
+QUERY = """\
+[out:json][timeout:600];
+area["ISO3166-1"="IR"][admin_level=2]->.iran;
+rel(area.iran)["admin_level"="4"]["boundary"="administrative"]->.provinces;
+foreach .provinces->.p (
+  .p out tags;
+  .p map_to_area->.parea;
+  node(area.parea)["place"~"^(city|town)$"];
+  out tags;
+);
 """
 
 
-def fetch_cities(provinces: list[dict], timeout: float = 300.0) -> dict:
-    """Fetch place=city|town nodes for each province relation."""
-    out: dict[str, dict] = {}
+def fetch_cities(timeout: float = 600.0) -> dict:
+    """Fetch place=city|town nodes grouped by province via a single Overpass call."""
     with httpx.Client(timeout=timeout, headers={"User-Agent": USER_AGENT}) as client:
-        for p in provinces:
-            if p.get("type") != "relation":
-                continue
-            rid = p["id"]
-            resp = client.post(OVERPASS_API, data={"data": _query(rid)})
-            resp.raise_for_status()
-            out[str(rid)] = {
-                "name": (p.get("tags") or {}).get("name"),
-                "cities": resp.json().get("elements", []),
+        resp = client.post(OVERPASS_API, data={"data": QUERY})
+        resp.raise_for_status()
+        data = resp.json()
+
+    out: dict[str, dict] = {}
+    current: dict | None = None
+    for el in data.get("elements", []):
+        if el.get("type") == "relation":
+            current = {
+                "name": (el.get("tags") or {}).get("name"),
+                "cities": [],
             }
+            out[str(el["id"])] = current
+        elif el.get("type") == "node" and current is not None:
+            current["cities"].append(el)
     return out
 
 
