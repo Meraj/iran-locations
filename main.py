@@ -1,7 +1,15 @@
+import json
+
 import httpx
 import typer
 
+from cities import CITIES_FILE, fetch_cities, save_cities
 from provinces import PROVINCES_FILE, fetch_provinces, save_provinces
+from provinces_osm import (
+    PROVINCES_OSM_FILE,
+    fetch_provinces_osm,
+    save_provinces_osm,
+)
 
 PROVINCES_GUIDE = """\
 How to fetch Iran provinces:
@@ -43,6 +51,33 @@ def fetch_provinces_cmd(
 
     count = save_provinces(payload)
     typer.echo(f"Saved {count} provinces to {PROVINCES_FILE}")
+
+
+@app.command(name="fetch-provinces-osm")
+def fetch_provinces_osm_cmd() -> None:
+    """Fetch all Iran provinces from OSM Overpass and overwrite data/provinces_osm.json."""
+    payload = fetch_provinces_osm()
+    count = save_provinces_osm(payload)
+    typer.echo(f"Saved {count} provinces to {PROVINCES_OSM_FILE}")
+
+
+@app.command(name="fetch-cities")
+def fetch_cities_cmd() -> None:
+    """Fetch place=city|town for each province from OSM Overpass and overwrite data/cities.json.
+
+    Reads provinces from data/provinces_osm.json. Run `fetch-provinces-osm` first.
+    """
+    if not PROVINCES_OSM_FILE.exists():
+        typer.echo(
+            f"{PROVINCES_OSM_FILE} not found. Run `fetch-provinces-osm` first.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    provinces = json.loads(PROVINCES_OSM_FILE.read_text(encoding="utf-8")).get("elements", [])
+    payload = fetch_cities(provinces)
+    total = save_cities(payload)
+    typer.echo(f"Saved {total} cities across {len(payload)} provinces to {CITIES_FILE}")
 
 
 @app.command()
