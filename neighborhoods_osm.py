@@ -1,8 +1,9 @@
 import json
+import time
 
 import httpx
 
-from settings import DATA_DIR, OVERPASS_API, USER_AGENT
+from settings import DATA_DIR, OVERPASS_API, USER_AGENT, heartbeat, log
 
 NEIGHBORHOODS_OSM_FILE = DATA_DIR / "neighborhoods_osm.json"
 NEIGHBORHOODS_OSM_DIR = DATA_DIR / "neighborhoods_osm"
@@ -42,31 +43,44 @@ out geom;
 
 
 def fetch_neighborhoods_osm_by_province(province_id: int, timeout: float = 700.0) -> dict:
-    return _fetch(QUERY_PROVINCE.format(province_id=province_id), timeout)
+    return _fetch(QUERY_PROVINCE.format(province_id=province_id), timeout, label=f"province {province_id}")
 
 
 def fetch_neighborhoods_osm_by_city(city_id: int, timeout: float = 300.0) -> dict:
-    return _fetch(QUERY_CITY.format(city_id=city_id), timeout)
+    return _fetch(QUERY_CITY.format(city_id=city_id), timeout, label=f"city {city_id}")
 
 
-def _fetch(query: str, timeout: float) -> dict:
+def _fetch(query: str, timeout: float, *, label: str) -> dict:
+    log(f"[{label}] POST {OVERPASS_API} (timeout={timeout:.0f}s, query={len(query)} chars)")
+    started = time.monotonic()
     with httpx.Client(timeout=timeout, headers={"User-Agent": USER_AGENT}) as client:
-        resp = client.post(OVERPASS_API, data={"data": query})
-        resp.raise_for_status()
-        data = resp.json()
+        with heartbeat(f"[{label}] waiting for Overpass"):
+            resp = client.post(OVERPASS_API, data={"data": query})
+    log(
+        f"[{label}] {resp.status_code} {resp.reason_phrase} in "
+        f"{time.monotonic() - started:.1f}s ({len(resp.content):,} bytes)"
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    elements = data.get("elements", [])
+    log(f"[{label}] parsing {len(elements):,} elements")
 
     out: dict[str, dict] = {}
     current: dict | None = None
-    for el in data.get("elements", []):
+    for el in elements:
         tags = el.get("tags") or {}
         if el.get("type") == "relation" and tags.get("admin_level") == "8":
-            current = {
-                "city": el,
-                "neighborhoods": [],
-            }
+            current = {"city": el, "neighborhoods": []}
             out[str(el["id"])] = current
+            log(f"  city {el['id']}: {tags.get('name')}")
         elif current is not None:
             current["neighborhoods"].append(el)
+
+    log(
+        f"[{label}] done: {len(out)} cities, "
+        f"{sum(len(c['neighborhoods']) for c in out.values())} neighborhoods"
+    )
     return out
 
 
