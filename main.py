@@ -4,7 +4,8 @@ import typer
 from cities_osm import CITIES_OSM_FILE, fetch_cities_osm, save_cities_osm
 from neighborhoods_osm import (
     NEIGHBORHOODS_OSM_FILE,
-    fetch_neighborhoods_osm,
+    fetch_neighborhoods_osm_by_city,
+    fetch_neighborhoods_osm_by_province,
     save_neighborhoods_osm,
 )
 from provinces import PROVINCES_FILE, fetch_provinces, save_provinces
@@ -73,11 +74,25 @@ def fetch_cities_osm_cmd() -> None:
 
 
 @app.command(name="fetch-neighborhoods-osm")
-def fetch_neighborhoods_osm_cmd() -> None:
-    """Fetch neighborhood-level features per admin_level=8 city from OSM Overpass and overwrite data/neighborhoods_osm.json."""
-    payload = fetch_neighborhoods_osm()
+def fetch_neighborhoods_osm_cmd(
+    province: int | None = typer.Option(None, "--province", help="Province (admin_level=4) relation id to scope to."),
+    city: int | None = typer.Option(None, "--city", help="City (admin_level=8) relation id to scope to."),
+) -> None:
+    """Fetch admin_level=8 cities (with boundary) and their neighborhood features (with boundary where present) from OSM Overpass.
+
+    Provide exactly one of --province or --city. Results merge into data/neighborhoods_osm.json.
+    """
+    if (province is None) == (city is None):
+        typer.echo("Provide exactly one of --province or --city.", err=True)
+        raise typer.Exit(2)
+
+    if province is not None:
+        payload = fetch_neighborhoods_osm_by_province(province)
+    else:
+        payload = fetch_neighborhoods_osm_by_city(city)  # type: ignore[arg-type]
+
     total = save_neighborhoods_osm(payload)
-    typer.echo(f"Saved {total} neighborhoods across {len(payload)} cities to {NEIGHBORHOODS_OSM_FILE}")
+    typer.echo(f"Fetched {total} neighborhoods across {len(payload)} cities. Merged into {NEIGHBORHOODS_OSM_FILE}")
 
 
 @app.command()
